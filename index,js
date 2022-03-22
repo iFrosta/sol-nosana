@@ -1,0 +1,34 @@
+  /** @type {IssuerClaim} */
+  const claim = (paymentP, optAmountShape = undefined) => {
+    return E.when(paymentP, srcPayment => {
+      assertLivePayment(srcPayment);
+      const srcPaymentBalance = paymentLedger.get(srcPayment);
+      assertAmountConsistent(srcPaymentBalance, optAmountShape);
+      // Note COMMIT POINT within moveAssets.
+      const [payment] = moveAssets(
+        harden([srcPayment]),
+        harden([srcPaymentBalance]),
+      );
+      return payment;
+    });
+  };
+
+  /** @type {IssuerCombine} */
+  const combine = (fromPaymentsPArray, optTotalAmount = undefined) => {
+    assertCopyArray(fromPaymentsPArray, 'fromPaymentsArray');
+    // Payments in `fromPaymentsPArray` must be distinct. Alias
+    // checking is delegated to the `moveAssets` function.
+    return Promise.all(fromPaymentsPArray).then(fromPaymentsArray => {
+      fromPaymentsArray.every(assertLivePayment);
+      const totalPaymentsBalance = fromPaymentsArray
+        .map(paymentLedger.get)
+        .reduce(add, emptyAmount);
+      assertAmountConsistent(totalPaymentsBalance, optTotalAmount);
+      // Note COMMIT POINT within moveAssets.
+      const [payment] = moveAssets(
+        harden(fromPaymentsArray),
+        harden([totalPaymentsBalance]),
+      );
+      return payment;
+    });
+  };
